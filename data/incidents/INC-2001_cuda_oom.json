@@ -1,0 +1,23 @@
+{
+  "incident_id": "INC-2001",
+  "timestamp": "2026-09-28T10:30:00Z",
+  "service": "recommendation-engine",
+  "environment": "production",
+  "severity": "high",
+  "summary": "Inference requests timing out with CUDA memory exhaustion",
+  "symptoms": [
+    "CUDA out of memory",
+    "P99 latency > 5000ms"
+  ],
+  "logs": [
+    "RuntimeError: CUDA out of memory. Tried to allocate 2.00 GiB (GPU 0; 15.78 GiB total capacity; 14.10 GiB already allocated)"
+  ],
+  "metrics": {
+    "gpu_memory": "100%",
+    "batch_size": 64
+  },
+  "recent_changes": [
+    "Batch size increased from 16 to 64 two hours ago"
+  ],
+  "status": "investigating"
+}

@@ -40,12 +40,18 @@ class HindsightClient:
             print(f"[Hindsight Retain Mock] Retained: '{memory_text[:80]}...'")
             return {"status": "success", "mode": "mock", "retained_content": memory_text}
 
+        # Ensure all metadata values are strings as required by Hindsight Cloud schema
+        sanitized_metadata = {
+            k: (", ".join(v) if isinstance(v, list) else str(v))
+            for k, v in (metadata or {}).items()
+        }
+
         url = f"{self.api_url}/v1/default/banks/{self.bank_id}/memories"
         payload = {
             "items": [
                 {
                     "content": memory_text,
-                    "metadata": metadata or {}
+                    "metadata": sanitized_metadata
                 }
             ]
         }
