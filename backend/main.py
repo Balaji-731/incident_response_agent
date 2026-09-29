@@ -3,16 +3,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
-from backend.api import incidents
+from backend.database.db import init_db
+from backend.api import incidents, memories
+
 load_dotenv()
+
+# Initialize SQLite database
+init_db()
 
 app = FastAPI(
     title="Incident Response Agent API",
     description="AI-powered copilot with persistent organizational memory via Hindsight",
-    version="0.1.0"
+    version="1.0.0"
 )
 
-# Enable CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,13 +25,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(incidents.router)
+app.include_router(memories.router)
+
 @app.get("/")
 def read_root():
-    return {
-        "status": "online",
-        "service": "Incident Response Agent",
-        "version": "0.1.0"
-    }
+    return {"status": "online", "service": "Incident Response Agent"}
 
 @app.get("/api/health")
 def health_check():
@@ -37,9 +40,6 @@ def health_check():
         "groq_configured": bool(os.getenv("GROQ_API_KEY"))
     }
 
-# Include the incidents API router
-app.include_router(incidents.router)
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=os.getenv("HOST"), port=int(os.getenv("PORT")), reload=True)
+    uvicorn.run("main:app", host=os.getenv("HOST", "127.0.0.1"), port=int(os.getenv("PORT", 8000)), reload=True)

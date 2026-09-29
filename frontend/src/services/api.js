@@ -5,6 +5,15 @@ export async function fetchHealth() {
   return res.json();
 }
 
+export async function parseRawLog(raw_log) {
+  const res = await fetch(`${API_BASE_URL}/incidents/parse-log`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ raw_log })
+  });
+  return res.json();
+}
+
 export async function createIncident(incidentData) {
   const res = await fetch(`${API_BASE_URL}/incidents`, {
     method: "POST",
@@ -31,6 +40,18 @@ export async function resolveIncident(incidentId, resolutionData) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(resolutionData)
+  });
+  return res.json();
+}
+
+export async function searchMemories(query, top_k = 5) {
+  const res = await fetch(`${API_BASE_URL}/memories/search?q=${encodeURIComponent(query)}&top_k=${top_k}`);
+  return res.json();
+}
+
+export async function resetSystem() {
+  const res = await fetch(`${API_BASE_URL}/incidents/reset`, {
+    method: "DELETE"
   });
   return res.json();
 }
