@@ -104,6 +104,13 @@ export default function App() {
     e.preventDefault();
     setLoading(true);
     setAssessment(null);
+
+    // Reset Tab 3 inputs to empty for fresh manual entry
+    setRootCause('');
+    setActualFix('');
+    setFailedAttempts('');
+    setResolutionStatus(null);
+
     try {
       const payload = {
         service,
@@ -122,15 +129,6 @@ export default function App() {
       
       const result = await analyzeIncident(created.incident_id);
       setAssessment(result);
-      
-      // Auto-fill Tab 3 fix candidate
-      if (result.hypotheses && result.hypotheses.length > 0) {
-        setRootCause(result.hypotheses[0].statement);
-      }
-      if (result.recommended_actions && result.recommended_actions.length > 0) {
-        setActualFix(result.recommended_actions[0]);
-      }
-      
       setActiveTab('investigation');
     } catch (err) {
       console.error(err);
@@ -143,17 +141,16 @@ export default function App() {
   const handleSelectIncident = async (inc) => {
     setSelectedIncident(inc);
     setLoading(true);
+
+    // Reset Tab 3 inputs to empty for fresh manual entry
+    setRootCause('');
+    setActualFix('');
+    setFailedAttempts('');
+    setResolutionStatus(null);
+
     try {
       const res = await analyzeIncident(inc.incident_id);
       setAssessment(res);
-      
-      if (res.hypotheses && res.hypotheses.length > 0) {
-        setRootCause(res.hypotheses[0].statement);
-      }
-      if (res.recommended_actions && res.recommended_actions.length > 0) {
-        setActualFix(res.recommended_actions[0]);
-      }
-      
       setActiveTab('investigation');
     } catch (err) {
       console.error(err);
