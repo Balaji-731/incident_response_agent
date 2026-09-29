@@ -32,7 +32,7 @@ class MemoryRecallClassifier:
 
             content = mem.get("content", "")
             
-            # Extract failed attempts safely from metadata string or list
+            # Extract metadata fields safely
             metadata = mem.get("metadata") or {}
             failed_attempts_raw = metadata.get("failed_attempts")
             failed_attempts: List[str] = []
@@ -53,7 +53,10 @@ class MemoryRecallClassifier:
                 content=content,
                 score=score,
                 relevance=relevance,
-                failed_attempts=failed_attempts
+                failed_attempts=failed_attempts,
+                service=metadata.get("service"),
+                root_cause=metadata.get("root_cause"),
+                resolution=metadata.get("resolution")
             ))
 
         status = "found" if highest_score >= 0.85 else ("related_only" if highest_score >= 0.65 else "none")

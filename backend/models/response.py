@@ -5,17 +5,20 @@ class MemoryMatch(BaseModel):
     memory_id: Optional[str] = None
     content: str
     score: float
-    relevance: str = Field(..., example="strong")  # strong, related, weak
+    relevance: str = Field(..., example="strong")
     failed_attempts: List[str] = Field(default_factory=list)
+    service: Optional[str] = None
+    root_cause: Optional[str] = None
+    resolution: Optional[str] = None
 
 class HistoricalEvidence(BaseModel):
-    status: str = Field(..., example="found")  # found, related_only, none
+    status: str = Field(..., example="found")
     matches: List[MemoryMatch] = Field(default_factory=list)
 
 class Hypothesis(BaseModel):
     statement: str
     evidence: List[str]
-    status: str = Field(default="unconfirmed", example="unconfirmed")  # unconfirmed, confirmed, rejected
+    status: str = Field(default="unconfirmed", example="unconfirmed")
 
 class AgentAssessmentResponse(BaseModel):
     incident_id: str

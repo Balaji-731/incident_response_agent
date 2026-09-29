@@ -17,11 +17,11 @@ from backend.hindsight.memory_manager import memory_manager
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
 
 @router.post("/parse-log")
-def parse_raw_log_endpoint(payload: dict):
+async def parse_raw_log_endpoint(payload: dict):
     raw_text = payload.get("raw_log", "")
     if not raw_text:
         raise HTTPException(status_code=400, detail="raw_log field is required")
-    parsed_data = LogParser.parse_raw_log(raw_text)
+    parsed_data = await LogParser.parse_raw_log(raw_text)
     return parsed_data
 
 @router.post("", response_model=Incident)
@@ -127,3 +127,10 @@ async def reset_all_data(db: Session = Depends(get_db)):
         "status": "success",
         "message": f"SQLite database and Hindsight memory bank cleared. {hindsight_msg}"
     }
+
+@router.post("/parse-log")
+async def parse_raw_log_endpoint(payload: dict):
+    raw_text = payload.get("raw_log", "")
+    if not raw_text:
+        raise HTTPException(status_code=400, detail="raw_log field is required")
+    return await LogParser.parse_raw_log(raw_text)

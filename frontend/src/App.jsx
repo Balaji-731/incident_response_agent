@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, Brain, CheckCircle2, AlertTriangle, 
   Activity, Save, Database, Sparkles, RefreshCw, FileText, 
-  Search, ListPlus, Sliders, Layers, Terminal, Trash2
+  Search, ListPlus, Sliders, Layers, Terminal, Trash2, X, ChevronRight, Zap
 } from 'lucide-react';
 import { 
   fetchHealth, parseRawLog, createIncident, listIncidents, 
@@ -13,7 +13,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('intake'); // intake, investigation, resolution, explorer
   const [health, setHealth] = useState(null);
   
-  // Incidents state
+  // Active Incident & Assessment State (Binds Tabs 1, 2, and 3)
   const [incidentsList, setIncidentsList] = useState([]);
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [assessment, setAssessment] = useState(null);
@@ -29,12 +29,15 @@ export default function App() {
   const [recentChanges, setRecentChanges] = useState('');
   const [parsing, setParsing] = useState(false);
 
-  // Resolution state
+  // Resolution Form State
   const [rootCause, setRootCause] = useState('');
   const [actualFix, setActualFix] = useState('');
-  const [failedAttempts, setFailedAttempts] = useState('Restarted GPU inference pods');
+  const [failedAttempts, setFailedAttempts] = useState('');
   const [retaining, setRetaining] = useState(false);
   const [resolutionStatus, setResolutionStatus] = useState(null);
+
+  // Memory Detail Modal State
+  const [activeMemoryModal, setActiveMemoryModal] = useState(null);
 
   // Memory Explorer state
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,7 +61,7 @@ export default function App() {
     }
   };
 
-  // Reset System Handler (Wipes SQLite DB & Hindsight Cloud Bank via Server)
+  // Reset System Handler
   const handleResetSystem = async () => {
     if (!window.confirm("Are you sure you want to clear all SQLite incidents and reset Hindsight Cloud memory bank?")) return;
     setLoading(true);
@@ -76,7 +79,7 @@ export default function App() {
     }
   };
 
-  // Auto-parse raw logs
+  // Auto-parse raw logs using Universal AI Parser
   const handleAutoParseLog = async () => {
     if (!rawLogs.trim()) return;
     setParsing(true);
@@ -86,6 +89,9 @@ export default function App() {
       setSeverity(parsed.severity || severity);
       setSummary(parsed.summary || summary);
       setSymptoms((parsed.symptoms || []).join(', '));
+      if (parsed.recent_changes) {
+        setRecentChanges((parsed.recent_changes || []).join(', '));
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -93,7 +99,7 @@ export default function App() {
     }
   };
 
-  // Submit custom incident
+  // Submit custom incident & synchronize tabs 1, 2, and 3
   const handleCreateAndAnalyze = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -116,6 +122,15 @@ export default function App() {
       
       const result = await analyzeIncident(created.incident_id);
       setAssessment(result);
+      
+      // Auto-fill Tab 3 fix candidate
+      if (result.hypotheses && result.hypotheses.length > 0) {
+        setRootCause(result.hypotheses[0].statement);
+      }
+      if (result.recommended_actions && result.recommended_actions.length > 0) {
+        setActualFix(result.recommended_actions[0]);
+      }
+      
       setActiveTab('investigation');
     } catch (err) {
       console.error(err);
@@ -124,13 +139,21 @@ export default function App() {
     }
   };
 
-  // Select an existing incident from history
+  // Select existing incident and bind tabs
   const handleSelectIncident = async (inc) => {
     setSelectedIncident(inc);
     setLoading(true);
     try {
       const res = await analyzeIncident(inc.incident_id);
       setAssessment(res);
+      
+      if (res.hypotheses && res.hypotheses.length > 0) {
+        setRootCause(res.hypotheses[0].statement);
+      }
+      if (res.recommended_actions && res.recommended_actions.length > 0) {
+        setActualFix(res.recommended_actions[0]);
+      }
+      
       setActiveTab('investigation');
     } catch (err) {
       console.error(err);
@@ -139,7 +162,27 @@ export default function App() {
     }
   };
 
-  // Retain resolution & automatically refresh assessment
+  // Auto-fill Tab 3 fix from Agent Diagnosis
+  const handleAutoFillResolution = () => {
+    if (!assessment) return;
+    if (assessment.hypotheses && assessment.hypotheses.length > 0) {
+      setRootCause(assessment.hypotheses[0].statement);
+    }
+    if (assessment.recommended_actions && assessment.recommended_actions.length > 0) {
+      setActualFix(assessment.recommended_actions[0]);
+    }
+  };
+
+  // Apply resolution template from memory card to Tab 3
+  const handleApplyResolutionTemplate = (mem) => {
+    if (mem.root_cause) setRootCause(mem.root_cause);
+    if (mem.resolution) setActualFix(mem.resolution);
+    if (mem.failed_attempts) setFailedAttempts(Array.isArray(mem.failed_attempts) ? mem.failed_attempts.join(", ") : mem.failed_attempts);
+    setActiveMemoryModal(null);
+    setActiveTab('resolution');
+  };
+
+  // Retain resolution
   const handleResolveSubmit = async (e) => {
     e.preventDefault();
     if (!selectedIncident) return;
@@ -153,7 +196,6 @@ export default function App() {
       setResolutionStatus(res);
       await loadIncidents();
       
-      // Automatically re-analyze incident so Tab 2 reflects newly retained memory immediately
       const updatedAssessment = await analyzeIncident(selectedIncident.incident_id);
       setAssessment(updatedAssessment);
     } catch (err) {
@@ -163,7 +205,7 @@ export default function App() {
     }
   };
 
-  // Search Hindsight Memory Explorer
+  // Memory Explorer Search
   const handleExplorerSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -191,14 +233,14 @@ export default function App() {
               <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
                 Incident Response Agent
                 <span className="text-[10px] bg-indigo-950 text-indigo-400 border border-indigo-800 px-2 py-0.5 rounded-full font-mono">
-                  v1.0 Production
+                  v1.0 Universal AI
                 </span>
               </h1>
               <p className="text-xs text-slate-400">AI Copilot with Persistent Hindsight Memory Bank</p>
             </div>
           </div>
 
-          {/* System Controls & Status Badges */}
+          {/* Controls & Badges */}
           <div className="flex items-center space-x-3 text-xs font-mono">
             <button
               onClick={handleResetSystem}
@@ -206,7 +248,7 @@ export default function App() {
               className="flex items-center space-x-1.5 bg-rose-950/80 text-rose-300 border border-rose-800/80 hover:bg-rose-900 px-3 py-1.5 rounded-lg text-xs font-semibold transition"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              <span>Reset Database & Hindsight</span>
+              <span>Reset System</span>
             </button>
 
             <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
@@ -227,6 +269,22 @@ export default function App() {
           </div>
         </div>
 
+        {/* Global Active Incident Context Sync Banner */}
+        {selectedIncident && (
+          <div className="max-w-7xl mx-auto mt-3 bg-indigo-950/60 border border-indigo-500/40 rounded-lg px-4 py-2 flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-3">
+              <span className="font-mono font-bold text-indigo-400 bg-indigo-900/80 px-2 py-0.5 rounded border border-indigo-700">
+                ACTIVE: {selectedIncident.incident_id}
+              </span>
+              <span className="font-semibold text-slate-200">{selectedIncident.service}</span>
+              <span className="text-slate-400 truncate max-w-md">{selectedIncident.summary}</span>
+            </div>
+            <span className="text-[10px] font-bold text-amber-400 bg-amber-950 px-2 py-0.5 rounded uppercase border border-amber-800">
+              {selectedIncident.status}
+            </span>
+          </div>
+        )}
+
         {/* Navigation Tabs */}
         <div className="max-w-7xl mx-auto flex space-x-2 mt-4 pt-2 border-t border-slate-800/60">
           <button
@@ -238,7 +296,7 @@ export default function App() {
             }`}
           >
             <ListPlus className="w-4 h-4" />
-            <span>1. Dynamic Intake & Log Parser</span>
+            <span>1. Dynamic Intake & AI Log Parser</span>
           </button>
           
           <button
@@ -262,7 +320,7 @@ export default function App() {
             }`}
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>3. Resolution & Retain Lab</span>
+            <span>3. Resolution Lab ({selectedIncident?.incident_id || 'None'})</span>
           </button>
 
           <button
@@ -282,23 +340,22 @@ export default function App() {
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto p-6">
         
-        {/* TAB 1: DYNAMIC INTAKE & LOG PARSER */}
+        {/* TAB 1: DYNAMIC INTAKE & AI LOG PARSER */}
         {activeTab === 'intake' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Intake Form */}
             <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4 shadow-xl">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
                   <Terminal className="w-4 h-4 text-indigo-400" />
-                  Custom Incident Intake & Raw Log Parser
+                  Universal AI Log Parser & Incident Intake
                 </h2>
               </div>
 
               <form onSubmit={handleCreateAndAnalyze} className="space-y-4 text-xs">
-                {/* Raw Log Trace Input with Auto-Parse Button */}
+                {/* Raw Log Trace Input */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-slate-300 font-semibold">Paste Raw Server Logs / Stack Trace:</label>
+                    <label className="text-slate-300 font-semibold">Paste Any Raw Server Log / Stack Trace (Python, Java, Go, K8s, SQL, etc.):</label>
                     <button
                       type="button"
                       onClick={handleAutoParseLog}
@@ -306,21 +363,21 @@ export default function App() {
                       className="flex items-center space-x-1.5 bg-indigo-950 text-indigo-300 border border-indigo-800 hover:bg-indigo-900 px-2.5 py-1 rounded text-[11px] font-semibold transition"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{parsing ? "Parsing..." : "⚡ Auto-Parse Log Trace"}</span>
+                      <span>{parsing ? "AI Extracting..." : "⚡ Universal AI Log Extract"}</span>
                     </button>
                   </div>
                   <textarea
                     rows={4}
                     value={rawLogs}
                     onChange={(e) => setRawLogs(e.target.value)}
-                    placeholder="Paste raw log output (e.g. RuntimeError: CUDA out of memory... or HTTP 503 Timeout)"
+                    placeholder="Paste log snippet from any service or infrastructure..."
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-rose-300 font-mono text-xs focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">Target Service:</label>
+                    <label className="block text-slate-300 font-semibold mb-1">Service Name:</label>
                     <input
                       type="text"
                       value={service}
@@ -378,7 +435,7 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Recent Changes / Deployments (Comma separated):</label>
+                  <label className="block text-slate-300 font-semibold mb-1">Recent Changes / Deployments:</label>
                   <input
                     type="text"
                     value={recentChanges}
@@ -394,22 +451,19 @@ export default function App() {
                   className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-lg transition shadow-lg shadow-indigo-600/20"
                 >
                   <Brain className="w-4 h-4" />
-                  <span>{loading ? "Analyzing with Hindsight Memory..." : "Submit Incident & Trigger AI Agent Diagnosis"}</span>
+                  <span>{loading ? "Analyzing with Hindsight Memory..." : "Submit & Auto-Bind Tabs 2 and 3"}</span>
                 </button>
               </form>
             </div>
 
-            {/* Persistent Database History Panel */}
+            {/* Persistent Database Queue */}
             <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4 shadow-xl">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
                   <Database className="w-4 h-4 text-emerald-400" />
-                  Persisted Incidents Queue (SQLite DB)
+                  SQLite Incidents Queue
                 </h2>
-                <button 
-                  onClick={loadIncidents}
-                  className="text-xs text-slate-400 hover:text-slate-200 p-1"
-                >
+                <button onClick={loadIncidents} className="text-xs text-slate-400 hover:text-slate-200 p-1">
                   <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -424,7 +478,7 @@ export default function App() {
                       onClick={() => handleSelectIncident(inc)}
                       className={`p-3.5 rounded-lg border text-xs cursor-pointer transition ${
                         selectedIncident?.incident_id === inc.incident_id
-                          ? 'bg-indigo-950/60 border-indigo-500/80 text-slate-100'
+                          ? 'bg-indigo-950/80 border-indigo-500 text-slate-100 shadow-md'
                           : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300'
                       }`}
                     >
@@ -454,7 +508,7 @@ export default function App() {
             {!selectedIncident ? (
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-12 text-center text-slate-400">
                 <ShieldAlert className="w-8 h-8 text-amber-400 mx-auto mb-3" />
-                <p className="text-sm">No incident selected for investigation. Create or select an incident from Tab 1.</p>
+                <p className="text-sm">No active incident selected. Select or parse an incident in Tab 1.</p>
               </div>
             ) : (
               <>
@@ -463,7 +517,7 @@ export default function App() {
                   <div className="bg-amber-950/40 border border-amber-500/40 rounded-xl p-4 space-y-2">
                     <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs">
                       <AlertTriangle className="w-4 h-4" />
-                      <span>HINDSIGHT FAILED APPROACH ALERT & WARNINGS</span>
+                      <span>HINDSIGHT FAILED APPROACH WARNINGS</span>
                     </div>
                     <ul className="text-xs text-amber-200/90 space-y-1 pl-6 list-disc font-medium">
                       {assessment.warnings.map((w, idx) => (
@@ -479,12 +533,12 @@ export default function App() {
                     <div className="flex items-center space-x-2">
                       <Database className="w-4 h-4 text-emerald-400" />
                       <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                        Recalled Organizational Experience from Hindsight Memory Bank
+                        Recalled Experience for [{selectedIncident.incident_id}] (Click Card to Inspect Details)
                       </h2>
                     </div>
 
                     <div className="flex items-center space-x-3 text-xs">
-                      <span className="text-slate-400">Similarity Threshold:</span>
+                      <span className="text-slate-400">Similarity Filter:</span>
                       <input
                         type="range"
                         min="0.4"
@@ -501,21 +555,28 @@ export default function App() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {assessment?.historical_evidence?.matches?.filter(m => m.score >= threshold).length === 0 ? (
                       <p className="text-xs text-slate-500 italic col-span-2 p-4 text-center">
-                        No historical memories meet the current similarity threshold ({(threshold * 100).toFixed(0)}%). Investigating from current evidence.
+                        No historical memories meet similarity threshold ({(threshold * 100).toFixed(0)}%). Investigating from current evidence.
                       </p>
                     ) : (
                       assessment?.historical_evidence?.matches?.filter(m => m.score >= threshold).map((match, idx) => (
-                        <div key={idx} className="bg-slate-950 border border-slate-800 rounded-lg p-4 text-xs space-y-2">
+                        <div 
+                          key={idx} 
+                          onClick={() => setActiveMemoryModal(match)}
+                          className="bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-lg p-4 text-xs space-y-2 cursor-pointer transition shadow-md group"
+                        >
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-indigo-300">Memory Match #{idx + 1}</span>
+                            <span className="font-bold text-indigo-300 group-hover:text-indigo-200 flex items-center gap-1">
+                              Memory Match #{idx + 1}
+                              <ChevronRight className="w-3.5 h-3.5 text-indigo-400" />
+                            </span>
                             <span className="font-mono bg-indigo-950 text-indigo-400 border border-indigo-800 px-2 py-0.5 rounded text-[11px]">
-                              Similarity: {(match.score * 100).toFixed(0)}%
+                              {(match.score * 100).toFixed(0)}% Similarity
                             </span>
                           </div>
-                          <p className="text-slate-300 leading-relaxed">{match.content}</p>
+                          <p className="text-slate-300 leading-relaxed line-clamp-3">{match.content}</p>
                           {match.failed_attempts && match.failed_attempts.length > 0 && (
                             <div className="text-rose-400 font-mono text-[11px] bg-rose-950/50 border border-rose-900/50 p-2 rounded">
-                              ⚠️ Failed Action Recorded: {match.failed_attempts.join(", ")}
+                              ⚠️ Recorded Failed Fix: {match.failed_attempts.join(", ")}
                             </div>
                           )}
                         </div>
@@ -524,9 +585,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Agent Formulated Hypotheses & Action Checklist */}
+                {/* Hypotheses & Action Checklist */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Hypotheses */}
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3 shadow-xl">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-2">
                       <Brain className="w-4 h-4" />
@@ -536,15 +596,12 @@ export default function App() {
                       {assessment?.hypotheses?.map((h, idx) => (
                         <div key={idx} className="bg-slate-950 border border-indigo-950 rounded-lg p-3 text-xs space-y-1">
                           <div className="font-semibold text-slate-200">{h.statement}</div>
-                          <div className="text-slate-400 text-[11px]">
-                            Evidence: {h.evidence.join("; ")}
-                          </div>
+                          <div className="text-slate-400 text-[11px]">Evidence: {h.evidence.join("; ")}</div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Actions */}
                   <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3 shadow-xl">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4" />
@@ -568,75 +625,89 @@ export default function App() {
         {/* TAB 3: RESOLUTION & RETAIN LAB */}
         {activeTab === 'resolution' && (
           <div className="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6 shadow-xl">
-            <div className="border-b border-slate-800 pb-3">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
-                <Save className="w-4 h-4" />
-                Engineer Resolution Confirmation & Hindsight Retention Lab
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Confirm the verified fix and failed attempts to update the database and retain new experience into Vectorize Hindsight Cloud.
-              </p>
-            </div>
-
-            <form onSubmit={handleResolveSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Confirmed Root Cause:</label>
-                <input
-                  type="text"
-                  value={rootCause}
-                  onChange={(e) => setRootCause(e.target.value)}
-                  placeholder="e.g. Batch size increased to 64 exceeded GPU VRAM during concurrent inference"
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 text-slate-100 focus:border-indigo-500"
-                  required
-                />
+            {!selectedIncident ? (
+              <div className="p-8 text-center text-slate-400">
+                <ShieldAlert className="w-8 h-8 text-amber-400 mx-auto mb-3" />
+                <p className="text-sm">No active incident selected. Please select an incident in Tab 1.</p>
               </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Confirmed Resolution / Fix:</label>
-                <input
-                  type="text"
-                  value={actualFix}
-                  onChange={(e) => setActualFix(e.target.value)}
-                  placeholder="e.g. Reduced batch size from 64 back to 16 in config"
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 text-slate-100 focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Failed Fix Attempts (Comma separated):</label>
-                <input
-                  type="text"
-                  value={failedAttempts}
-                  onChange={(e) => setFailedAttempts(e.target.value)}
-                  placeholder="e.g. Restarted GPU inference pods, Cleared token cache"
-                  className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 text-slate-100 focus:border-indigo-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={retaining || !selectedIncident}
-                className="w-full flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition shadow-lg shadow-emerald-600/20"
-              >
-                <Save className="w-4 h-4" />
-                <span>{retaining ? "Retaining into Hindsight Cloud Bank..." : "Confirm Fix & Retain Organizational Experience"}</span>
-              </button>
-            </form>
-
-            {resolutionStatus && (
-              <div className="bg-emerald-950/60 border border-emerald-500/40 p-4 rounded-lg text-xs text-emerald-300 flex items-start space-x-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-bold">Retain Successful!</div>
-                  <p className="mt-0.5">{resolutionStatus.message}</p>
-                  {resolutionStatus.retained_memory_id && (
-                    <div className="font-mono text-[11px] text-emerald-400 mt-1">
-                      Retained Memory ID: {resolutionStatus.retained_memory_id}
-                    </div>
-                  )}
+            ) : (
+              <>
+                <div className="border-b border-slate-800 pb-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                      <Save className="w-4 h-4" />
+                      Resolution Lab for [{selectedIncident.incident_id}]
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={handleAutoFillResolution}
+                      className="flex items-center space-x-1.5 bg-indigo-950 text-indigo-300 border border-indigo-800 hover:bg-indigo-900 px-3 py-1 rounded text-xs font-semibold transition"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>⚡ Auto-Fill Fix from AI Diagnosis</span>
+                    </button>
+                  </div>
+                  <div className="text-xs text-slate-300 mt-2 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                    <div className="font-semibold text-white">{selectedIncident.service}: {selectedIncident.summary}</div>
+                  </div>
                 </div>
-              </div>
+
+                <form onSubmit={handleResolveSubmit} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Confirmed Root Cause:</label>
+                    <input
+                      type="text"
+                      value={rootCause}
+                      onChange={(e) => setRootCause(e.target.value)}
+                      placeholder="e.g. Batch size increased to 64 exceeded GPU VRAM during concurrent inference"
+                      className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 text-slate-100 focus:border-indigo-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Confirmed Resolution / Fix:</label>
+                    <input
+                      type="text"
+                      value={actualFix}
+                      onChange={(e) => setActualFix(e.target.value)}
+                      placeholder="e.g. Reduced batch size from 64 back to 16 in config"
+                      className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 text-slate-100 focus:border-indigo-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Failed Fix Attempts (Comma separated):</label>
+                    <input
+                      type="text"
+                      value={failedAttempts}
+                      onChange={(e) => setFailedAttempts(e.target.value)}
+                      placeholder="e.g. Restarted GPU inference pods, Cleared token cache"
+                      className="w-full bg-slate-950 border border-slate-800 rounded p-2.5 text-slate-100 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={retaining}
+                    className="w-full flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition shadow-lg shadow-emerald-600/20"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{retaining ? "Retaining into Hindsight Cloud Bank..." : `Confirm & Retain Fix for ${selectedIncident.incident_id}`}</span>
+                  </button>
+                </form>
+
+                {resolutionStatus && (
+                  <div className="bg-emerald-950/60 border border-emerald-500/40 p-4 rounded-lg text-xs text-emerald-300 flex items-start space-x-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold">Retain Successful!</div>
+                      <p className="mt-0.5">{resolutionStatus.message}</p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -673,17 +744,94 @@ export default function App() {
                   <p className="text-xs text-slate-500 italic p-4 text-center">Enter a search query to inspect stored memories in Hindsight Cloud.</p>
                 ) : (
                   explorerResults.map((mem, idx) => (
-                    <div key={idx} className="bg-slate-950 border border-slate-800 rounded-lg p-4 text-xs space-y-2">
+                    <div 
+                      key={idx} 
+                      onClick={() => setActiveMemoryModal(mem)}
+                      className="bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-lg p-4 text-xs space-y-2 cursor-pointer transition group"
+                    >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-indigo-400 font-bold">Memory #{idx + 1} ({mem.memory_id || 'ID: Cloud'})</span>
+                        <span className="font-mono text-indigo-400 font-bold group-hover:text-indigo-300">Memory #{idx + 1} ({mem.memory_id || 'Cloud ID'})</span>
                         <span className="font-mono bg-indigo-950 text-indigo-300 border border-indigo-800 px-2 py-0.5 rounded text-[11px]">
-                          Similarity Score: {((mem.score || 0) * 100).toFixed(0)}%
+                          Score: {((mem.score || 0) * 100).toFixed(0)}%
                         </span>
                       </div>
                       <p className="text-slate-200 leading-relaxed">{mem.content}</p>
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* EXPANDABLE MEMORY DETAIL MODAL */}
+        {activeMemoryModal && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-6 z-50">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center space-x-2">
+                  <Database className="w-5 h-5 text-indigo-400" />
+                  <h3 className="text-sm font-bold text-white">Detailed Hindsight Memory Inspection</h3>
+                </div>
+                <button 
+                  onClick={() => setActiveMemoryModal(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <div className="text-slate-400 font-semibold mb-1">Full Memory Text:</div>
+                  <p className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-slate-200 leading-relaxed">
+                    {activeMemoryModal.content}
+                  </p>
+                </div>
+
+                {activeMemoryModal.root_cause && (
+                  <div>
+                    <div className="text-slate-400 font-semibold mb-1">Recorded Root Cause:</div>
+                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800 text-indigo-300">
+                      {activeMemoryModal.root_cause}
+                    </div>
+                  </div>
+                )}
+
+                {activeMemoryModal.resolution && (
+                  <div>
+                    <div className="text-slate-400 font-semibold mb-1">Verified Resolution:</div>
+                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800 text-emerald-300 font-medium">
+                      {activeMemoryModal.resolution}
+                    </div>
+                  </div>
+                )}
+
+                {activeMemoryModal.failed_attempts && activeMemoryModal.failed_attempts.length > 0 && (
+                  <div>
+                    <div className="text-rose-400 font-semibold mb-1">Recorded Failed Fix Attempts:</div>
+                    <div className="bg-rose-950/40 p-2.5 rounded border border-rose-900/50 text-rose-300 font-mono">
+                      ⚠️ {Array.isArray(activeMemoryModal.failed_attempts) ? activeMemoryModal.failed_attempts.join(", ") : activeMemoryModal.failed_attempts}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+                <button
+                  type="button"
+                  onClick={() => handleApplyResolutionTemplate(activeMemoryModal)}
+                  className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-semibold text-xs transition"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>🚀 Apply Resolution as Fix Template in Tab 3</span>
+                </button>
+                <button
+                  onClick={() => setActiveMemoryModal(null)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-xs font-semibold"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
