@@ -835,7 +835,7 @@ export default function App() {
                   className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl font-semibold text-xs transition shadow-lg shadow-emerald-600/20"
                 >
                   <Save className="w-4 h-4" />
-                  <span>🚀 Apply Resolution as Fix Template in Tab 3</span>
+                  <span>Apply Resolution as Fix Template</span>
                 </button>
                 <button
                   onClick={() => setActiveMemoryModal(null)}
