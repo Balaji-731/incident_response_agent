@@ -32,10 +32,14 @@ class IncidentAgent:
         query = IncidentAnalyzer.extract_search_query(incident)
         current_evidence = IncidentAnalyzer.extract_current_evidence(incident)
 
-        # 2. Recall historical memory from Hindsight
-        historical_evidence = await MemoryRecallClassifier.get_historical_evidence(query)
+        # 2. Recall historical memory from Hindsight with precision domain & symptom matching
+        historical_evidence = await MemoryRecallClassifier.get_historical_evidence(
+            query, 
+            service=incident.service, 
+            symptoms=incident.symptoms
+        )
 
-        # 3. Handle LLM execution (Live Groq call or fallback rule-based reasoning)
+        # 3. Handle LLM execution
         if self.is_mock_llm:
             return self._generate_fallback_assessment(incident, current_evidence, historical_evidence)
 
